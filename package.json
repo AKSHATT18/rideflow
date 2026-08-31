@@ -1,0 +1,25 @@
+{
+    "private": true,
+    "workspaces": [
+        "apps/*",
+        "packages/*"
+    ],
+    "name": "rideflow",
+    "scripts": {
+        "typecheck": "npm run typecheck --workspaces",
+        "format": "prettier --write \".\"",
+        "build": "npm run build --workspaces",
+        "dev": "npm run dev --workspaces",
+        "lint": "npm run lint --workspaces"
+    },
+    "devDependencies": {
+        "@types/node": "^26.4.0",
+        "eslint": "^10.9.1",
+        "prettier": "^3.9.6",
+        "prisma": "^7.10.0",
+        "typescript": "^7.0.2"
+    },
+    "dependencies": {
+        "@prisma/client": "^7.10.0"
+    }
+}

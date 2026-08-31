@@ -1,0 +1,12 @@
+﻿{
+    "version":  "1.0.0",
+    "name":  "@rideflow/shared",
+    "main":  "dist/index.js",
+    "scripts":  {
+                    "build":  "tsc",
+                    "typecheck":  "tsc --noEmit",
+                    "lint":  "eslint \"src/**/*.ts\""
+                },
+    "types":  "dist/index.d.ts",
+    "private":  true
+}
