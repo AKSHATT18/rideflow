@@ -7,9 +7,90 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Minimal schema for Phase 1 verification
+enum Role {
+  PASSENGER
+  DRIVER
+  ADMIN
+}
+
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
+  id           String   @id @default(uuid())
+  email        String   @unique
+  phone        String   @unique
+  firstName    String
+  lastName     String
+  passwordHash String
+  role         Role     @default(PASSENGER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  driverProfile  DriverProfile?
+  passengerRides Ride[]         @relation("PassengerRides")
+  driverRides    Ride[]         @relation("DriverRides")
+}
+
+model DriverProfile {
+  id            String       @id @default(uuid())
+  userId        String       @unique
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  licenseNumber String?
+  vehicleMake   String?
+  vehicleModel  String?
+  vehiclePlate  String?
+  rating        Float        @default(5.0)
+  status        DriverStatus @default(OFFLINE)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+enum RideStatus {
+  REQUESTED
+  SEARCHING
+  DRIVER_ASSIGNED
+  DRIVER_ARRIVING
+  DRIVER_ARRIVED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum DriverStatus {
+  OFFLINE
+  ONLINE
+  BUSY
+}
+
+model Ride {
+  id          String  @id @default(uuid())
+  passengerId String
+  driverId    String?
+
+  pickupLat     Float
+  pickupLng     Float
+  pickupAddress String
+
+  destinationLat     Float
+  destinationLng     Float
+  destinationAddress String
+
+  vehicleType          String
+  estimatedDistanceKm  Float
+  estimatedDurationMin Float
+
+  estimatedFare Float
+  finalFare     Float?
+
+  status RideStatus @default(REQUESTED)
+
+  requestedAt DateTime  @default(now())
+  acceptedAt  DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+  cancelledAt DateTime?
+
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  passenger User  @relation("PassengerRides", fields: [passengerId], references: [id])
+  driver    User? @relation("DriverRides", fields: [driverId], references: [id])
 }
