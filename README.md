@@ -1,80 +1,67 @@
 # RideFlow
 
-Real-time rides. Right where you need them.
+A production-quality, real-time ride-hailing platform built with a modern stack.
 
-RideFlow is a production-quality, real-time ride-hailing platform built with a modern stack. It features a robust modular monolith architecture, real-time driver tracking via WebSockets, and geospatial queries using PostGIS.
+## Architecture
 
-## Current Status (Phase 1)
-Currently establishing the development foundation. Basic infrastructure, monorepo setup, standard UI design system, minimal API health checks, and database connectivity are in place. **Advanced features like real-time ride tracking, authentication, and driver matching are planned for later phases.**
-
-## Repository Structure
-
-The project utilizes an npm workspaces monorepo:
-
-```
-rideflow/
-├── apps/
-│   ├── web/        (Frontend: React, Vite, Tailwind CSS)
-│   └── server/     (Backend: Node.js, Express)
-├── packages/
-│   └── shared/     (Shared TypeScript types and constants)
-├── prisma/         (Database schemas and migrations)
-```
-
-## Technology Stack
-
-- **Frontend:** React, Vite, TypeScript, Tailwind CSS, React Router
-- **Backend:** Node.js, Express, TypeScript
-- **Database:** PostgreSQL with PostGIS
-- **ORM:** Prisma
-- **Tooling:** ESLint, Prettier, Docker Compose
-
-## Prerequisites
-
-- Node.js (v18+)
-- Docker & Docker Compose
-- Git
+- **Monorepo:** npm workspaces
+- **Frontend:** React, Vite, Tailwind CSS v3, Zustand, React Router, React Hook Form
+- **Backend:** Node.js, Express, Prisma, Zod, JWT
+- **Database:** PostgreSQL + PostGIS (via Docker)
+- **Maps:** Google Maps Platform
 
 ## Environment Setup
 
-1. Clone the repository
-2. Copy `.env.example` to `.env`:
-   ```bash
-   cp .env.example .env
-   ```
-3. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-## Infrastructure (PostgreSQL/PostGIS)
-
-Start the database using Docker Compose:
+### 1. Database Configuration
+RideFlow uses a Dockerized PostGIS database. Ensure Docker is running.
 ```bash
+# Start the database (exposed on localhost:5433 to prevent conflicts)
 docker-compose up -d
+
+# Push the database schema
+npx prisma db push
 ```
-This will start a PostgreSQL instance with the PostGIS extension enabled on port 5432.
+
+### 2. Google Maps API Configuration
+The Passenger application requires a valid Google Maps API Key to render maps, search locations, and calculate routes.
+
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
+2. Create a new project or select an existing one.
+3. Enable the following APIs:
+   - **Maps JavaScript API** (For rendering the map)
+   - **Places API** (For location autocomplete)
+   - **Directions API** (For route calculation)
+   - **Geocoding API** (For translating coordinates)
+4. Create an API Key in *APIs & Services > Credentials*.
+5. **Restrict your API key** to the specific APIs listed above, and restrict HTTP referrers to your development and production domains (e.g., `http://localhost:5173`).
+6. Copy `.env.example` to `.env` in the root of the project and add your API key:
+
+```env
+VITE_GOOGLE_MAPS_API_KEY="your_actual_api_key_here"
+```
+*(If the key is missing, the application will display a polished setup state instructing the user to add it, preventing a broken UI).*
 
 ## Running the Application
 
-### Backend
-1. Generate Prisma client (if applicable): `npx prisma generate`
-2. Start the API in dev mode:
-   ```bash
-   npm run dev --workspace=apps/server
-   ```
-3. Test the health endpoint: `GET http://localhost:4000/api/health`
+Start the backend and frontend development servers concurrently:
 
-### Frontend
-1. Start the Vite dev server:
-   ```bash
-   npm run dev --workspace=apps/web
-   ```
-2. Open `http://localhost:5173` in your browser.
+```bash
+# Start the backend API (http://localhost:4000)
+npm run dev --workspace=apps/server
 
-## Development Roadmap
-- **Phase 1:** Project Foundation (Current)
-- **Phase 2:** Core MVP Flow & Auth
-- **Phase 3:** Real-time Tracking (Socket.IO)
-- **Phase 4:** Trip Completion & Fare Calculation
-- **Phase 5+:** Admin Dashboard, Optimizations
+# Start the frontend UI (http://localhost:5173)
+npm run dev --workspace=apps/web
+```
+
+## Available Scripts (Root)
+
+- `npm run build --workspaces` - Builds all packages in the monorepo.
+- `npm run dev --workspace=apps/web` - Starts frontend development server.
+- `npm run dev --workspace=apps/server` - Starts backend development server.
+
+## Phases
+- **Phase 1:** Project Foundation & Infrastructure
+- **Phase 2:** Authentication, Roles, & Security
+- **Phase 3:** Maps, Geolocation & Passenger UI
+- **Phase 4:** Real-time Socket.IO, Driver Ride Execution, & Mock GPS
+- **Phase 5:** (Upcoming) Microservices, Redis Scaling, Payment Gateway
