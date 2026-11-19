@@ -13,34 +13,15 @@ enum Role {
   ADMIN
 }
 
-model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  phone        String   @unique
-  firstName    String
-  lastName     String
-  passwordHash String
-  role         Role     @default(PASSENGER)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  driverProfile  DriverProfile?
-  passengerRides Ride[]         @relation("PassengerRides")
-  driverRides    Ride[]         @relation("DriverRides")
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
 }
 
-model DriverProfile {
-  id            String       @id @default(uuid())
-  userId        String       @unique
-  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  licenseNumber String?
-  vehicleMake   String?
-  vehicleModel  String?
-  vehiclePlate  String?
-  rating        Float        @default(5.0)
-  status        DriverStatus @default(OFFLINE)
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+enum DriverStatus {
+  OFFLINE
+  ONLINE
+  BUSY
 }
 
 enum RideStatus {
@@ -54,10 +35,69 @@ enum RideStatus {
   CANCELLED
 }
 
-enum DriverStatus {
-  OFFLINE
-  ONLINE
-  BUSY
+enum SavedLocationType {
+  HOME
+  WORK
+  FAVORITE
+  RECENT
+}
+
+model User {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  phone        String     @unique
+  firstName    String
+  lastName     String
+  passwordHash String
+  role         Role       @default(PASSENGER)
+  status       UserStatus @default(ACTIVE)
+  avatarUrl    String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  driverProfile     DriverProfile?
+  passengerRides    Ride[]             @relation("PassengerRides")
+  driverRides       Ride[]             @relation("DriverRides")
+  savedLocations    SavedLocation[]
+  ratingsGiven      Rating[]           @relation("PassengerRatings")
+  ratingsReceived   Rating[]           @relation("DriverRatings")
+  emergencyContacts EmergencyContact[]
+  notifications     Notification[]
+  auditLogs         AdminAuditLog[]
+}
+
+model DriverProfile {
+  id            String       @id @default(uuid())
+  userId        String       @unique
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  licenseNumber String?
+  vehicleMake   String?
+  vehicleModel  String?
+  vehiclePlate  String?
+  vehicleYear   Int?
+  vehicleColor  String?
+  isVerified    Boolean      @default(false)
+  rating        Float        @default(5.0)
+  ratingCount   Int          @default(0)
+  totalTrips    Int          @default(0)
+  status        DriverStatus @default(OFFLINE)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model SavedLocation {
+  id        String            @id @default(uuid())
+  userId    String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      SavedLocationType @default(FAVORITE)
+  name      String
+  address   String
+  lat       Float
+  lng       Float
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@index([userId])
 }
 
 model Ride {
@@ -80,7 +120,9 @@ model Ride {
   estimatedFare Float
   finalFare     Float?
 
-  status RideStatus @default(REQUESTED)
+  status             RideStatus @default(REQUESTED)
+  cancellationReason String?
+  cancelledBy        String?
 
   requestedAt DateTime  @default(now())
   acceptedAt  DateTime?
@@ -91,6 +133,98 @@ model Ride {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  passenger User  @relation("PassengerRides", fields: [passengerId], references: [id])
-  driver    User? @relation("DriverRides", fields: [driverId], references: [id])
+  passenger  User        @relation("PassengerRides", fields: [passengerId], references: [id])
+  driver     User?       @relation("DriverRides", fields: [driverId], references: [id])
+  rating     Rating?
+  otp        RideOTP?
+  tripShares TripShare[]
+
+  @@index([passengerId])
+  @@index([driverId])
+  @@index([status])
+}
+
+model Rating {
+  id          String   @id @default(uuid())
+  rideId      String   @unique
+  ride        Ride     @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  passengerId String
+  passenger   User     @relation("PassengerRatings", fields: [passengerId], references: [id], onDelete: Cascade)
+  driverId    String
+  driver      User     @relation("DriverRatings", fields: [driverId], references: [id], onDelete: Cascade)
+  score       Int
+  comment     String?
+  tags        String[]
+  createdAt   DateTime @default(now())
+
+  @@index([driverId])
+  @@index([passengerId])
+}
+
+model RideOTP {
+  id           String    @id @default(uuid())
+  rideId       String    @unique
+  ride         Ride      @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  otpHash      String
+  encryptedOtp String
+  attempts     Int       @default(0)
+  maxAttempts  Int       @default(3)
+  verifiedAt   DateTime?
+  expiresAt    DateTime
+  createdAt    DateTime  @default(now())
+
+  @@index([rideId])
+}
+
+model EmergencyContact {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  phone        String
+  relationship String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model TripShare {
+  id        String   @id @default(uuid())
+  rideId    String
+  ride      Ride     @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([rideId])
+  @@index([token])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model AdminAuditLog {
+  id         String   @id @default(uuid())
+  adminId    String
+  admin      User     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  action     String
+  targetType String
+  targetId   String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([adminId])
+  @@index([action])
+  @@index([createdAt])
 }
