@@ -29,3 +29,38 @@ export const calculateFare = (
   const total = rules.baseFare + (distanceKm * rules.perKm) + (durationMin * rules.perMin);
   return Math.round(total);
 };
+
+export interface FareBreakdown {
+  baseFare: number;
+  perKmRate: number;
+  perMinRate: number;
+  distanceCharge: number;
+  timeCharge: number;
+  subtotal: number;
+  total: number;
+}
+
+export const getFareBreakdown = (
+  distanceKm: number,
+  durationMin: number,
+  vehicleType: string
+): FareBreakdown => {
+  const type = (vehicleType.toUpperCase() in FARE_RULES
+    ? vehicleType.toUpperCase()
+    : 'ECONOMY') as VehicleType;
+
+  const rules = FARE_RULES[type];
+  const distanceCharge = Number((distanceKm * rules.perKm).toFixed(2));
+  const timeCharge = Number((durationMin * rules.perMin).toFixed(2));
+  const total = Math.round(rules.baseFare + distanceCharge + timeCharge);
+
+  return {
+    baseFare: rules.baseFare,
+    perKmRate: rules.perKm,
+    perMinRate: rules.perMin,
+    distanceCharge,
+    timeCharge,
+    subtotal: total,
+    total,
+  };
+};
