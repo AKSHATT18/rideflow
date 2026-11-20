@@ -8,6 +8,7 @@ import type { FareEstimate } from '../../lib/fare';
 import { api } from '../../lib/axios';
 import { useRideStore } from '../../store/rideStore';
 import { reverseGeocode, POPULAR_LANDMARKS } from '../../services/geocodingService';
+import { usePassengerStore } from '../../store/passengerStore';
 import { cn } from '../../lib/utils';
 
 export const BookingPanel = () => {
@@ -19,11 +20,16 @@ export const BookingPanel = () => {
   } = useBookingStore();
 
   const { setActiveRide, joinRideRoom } = useRideStore();
+  const { savedLocations, fetchSavedLocations } = usePassengerStore();
 
   const [vehicles, setVehicles] = useState<FareEstimate[]>([]);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [isRequesting, setIsRequesting] = useState(false);
+
+  useEffect(() => {
+    fetchSavedLocations();
+  }, [fetchSavedLocations]);
 
   // Initialize flow
   useEffect(() => {
@@ -168,21 +174,48 @@ export const BookingPanel = () => {
 
           {/* Quick preset chips for instant demo selection */}
           {!destination && (
-            <div className="pt-1">
-              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block mb-1.5 flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-amber-500" /> Quick Select
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {POPULAR_LANDMARKS.slice(0, 4).map((landmark) => (
-                  <button
-                    key={landmark.placeId}
-                    type="button"
-                    onClick={() => handleQuickSelectDestination(landmark)}
-                    className="px-2.5 py-1 bg-gray-100 hover:bg-emerald-50 hover:text-brand-700 hover:border-emerald-200 border border-transparent rounded-full text-xs font-medium text-gray-700 transition-all truncate max-w-[170px]"
-                  >
-                    {landmark.mainText.split(' ')[0]} {landmark.mainText.split(' ')[1] || ''}
-                  </button>
-                ))}
+            <div className="pt-1 space-y-1.5">
+              {savedLocations.length > 0 && (
+                <div>
+                  <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">
+                    Saved Places
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {savedLocations.map((loc) => (
+                      <button
+                        key={loc.id}
+                        type="button"
+                        onClick={() => {
+                          setDestination({ lat: loc.lat, lng: loc.lng, address: loc.address });
+                          if (pickup) setState('CALCULATING_ROUTE');
+                          else setState('SELECTING_PICKUP');
+                        }}
+                        className="px-2.5 py-1 bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200/60 rounded-full text-xs font-semibold transition-all flex items-center gap-1"
+                      >
+                        <span>{loc.type === 'HOME' ? '🏠' : loc.type === 'WORK' ? '💼' : '⭐'}</span>
+                        <span>{loc.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block mb-1 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-amber-500" /> Popular Destinations
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {POPULAR_LANDMARKS.slice(0, 4).map((landmark) => (
+                    <button
+                      key={landmark.placeId}
+                      type="button"
+                      onClick={() => handleQuickSelectDestination(landmark)}
+                      className="px-2.5 py-1 bg-gray-100 hover:bg-emerald-50 hover:text-brand-700 hover:border-emerald-200 border border-transparent rounded-full text-xs font-medium text-gray-700 transition-all truncate max-w-[170px]"
+                    >
+                      {landmark.mainText.split(' ')[0]} {landmark.mainText.split(' ')[1] || ''}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           )}
