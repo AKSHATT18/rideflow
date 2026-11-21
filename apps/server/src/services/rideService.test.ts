@@ -17,6 +17,12 @@ vi.mock('../utils/db', () => ({
       findUnique: vi.fn(),
       update: vi.fn(),
     },
+    rideOTP: {
+      upsert: vi.fn(),
+      findUnique: vi.fn(),
+      update: vi.fn(),
+      create: vi.fn(),
+    },
     $transaction: vi.fn((callback) => callback(prisma)),
   },
 }));
