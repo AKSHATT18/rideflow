@@ -1,15 +1,67 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRideStore } from '../../store/rideStore';
 import { useBookingStore } from '../../store/bookingStore';
 import { api } from '../../lib/axios';
 import { Button } from '../Button';
-import { Car, CheckCircle2, User, Star } from 'lucide-react';
+import { Car, CheckCircle2, User, Star, KeyRound, Copy, Check, ShieldCheck, AlertCircle } from 'lucide-react';
 
 export const RideStatusPanel = () => {
   const { activeRideId, status, activeRide, clearRide, leaveRideRoom, driverLocation, isConnected } = useRideStore();
   const { pickup, destination, reset } = useBookingStore();
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [otpData, setOtpData] = useState<{
+    otp: string;
+    expiresAt: string;
+    isExpired: boolean;
+    attemptsRemaining: number;
+    isVerified: boolean;
+    verifiedAt?: string | null;
+  } | null>(null);
+  const [isLoadingOtp, setIsLoadingOtp] = useState(false);
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  // Fetch OTP securely for the assigned passenger
+  useEffect(() => {
+    let isMounted = true;
+    if (
+      activeRideId &&
+      ['DRIVER_ASSIGNED', 'DRIVER_ARRIVING', 'DRIVER_ARRIVED', 'IN_PROGRESS'].includes(status || '')
+    ) {
+      setIsLoadingOtp(true);
+      api
+        .get(`/rides/${activeRideId}/otp`)
+        .then((res) => {
+          if (isMounted && res.data?.data) {
+            setOtpData(res.data.data);
+            setOtpError(null);
+          }
+        })
+        .catch((err) => {
+          if (isMounted) {
+            setOtpError(err.response?.data?.message || 'Could not load pickup PIN');
+          }
+        })
+        .finally(() => {
+          if (isMounted) setIsLoadingOtp(false);
+        });
+    } else {
+      setOtpData(null);
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [activeRideId, status]);
+
+  const handleCopyOtp = () => {
+    if (otpData?.otp) {
+      navigator.clipboard.writeText(otpData.otp);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   const handleCancel = async () => {
     if (!activeRideId) return;
@@ -93,6 +145,110 @@ export const RideStatusPanel = () => {
               <Star className="w-3.5 h-3.5 fill-amber-400 stroke-none" />
               <span>{profile?.rating?.toFixed(1) || '5.0'}</span>
             </div>
+          </div>
+        )}
+
+        {/* Pickup Verification PIN Card */}
+        {activeRideId && ['DRIVER_ASSIGNED', 'DRIVER_ARRIVING', 'DRIVER_ARRIVED', 'IN_PROGRESS'].includes(status || '') && (
+          <div
+            className={`rounded-2xl border transition-all p-4 ${
+              status === 'IN_PROGRESS' || otpData?.isVerified
+                ? 'bg-emerald-50/80 border-emerald-200 text-emerald-900'
+                : 'bg-gradient-to-br from-brand-50/70 via-blue-50/40 to-indigo-50/50 border-brand-200/80 text-brand-950 shadow-sm'
+            }`}
+          >
+            {status === 'IN_PROGRESS' || otpData?.isVerified ? (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-emerald-100 text-emerald-700 rounded-xl flex items-center justify-center shrink-0 shadow-sm">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-emerald-950 flex items-center gap-1.5">
+                      Pickup Verified
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-200/80 text-emerald-800">
+                        Active
+                      </span>
+                    </h4>
+                    <p className="text-xs text-emerald-700">
+                      Identity verified securely with your driver.
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">PIN</span>
+                  <span className="font-mono font-bold text-base text-emerald-900 tracking-wider">
+                    {otpData?.otp || '••••'}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-brand-600 text-white flex items-center justify-center shadow-sm">
+                      <KeyRound className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-xs uppercase tracking-wider text-brand-900">
+                        Pickup Verification PIN
+                      </h4>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-semibold bg-white/90 text-brand-700 px-2.5 py-0.5 rounded-full border border-brand-200/60 shadow-xs">
+                    Share at pickup
+                  </span>
+                </div>
+
+                {isLoadingOtp && !otpData ? (
+                  <div className="py-3 text-center text-xs text-brand-700 animate-pulse font-medium">
+                    Generating secure pickup PIN...
+                  </div>
+                ) : otpError ? (
+                  <div className="py-2 text-xs text-red-600 flex items-center gap-1.5 font-medium">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{otpError}</span>
+                  </div>
+                ) : (
+                  <div className="bg-white/95 rounded-xl border border-brand-100/80 p-3 shadow-xs">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5" aria-label={`Pickup PIN: ${otpData?.otp || '••••'}`}>
+                        {(otpData?.otp || '••••').split('').map((digit, idx) => (
+                          <span
+                            key={idx}
+                            className="w-9 h-10 rounded-lg bg-gray-50 border border-gray-200 text-gray-900 font-mono text-xl font-extrabold flex items-center justify-center shadow-xs"
+                          >
+                            {digit}
+                          </span>
+                        ))}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleCopyOtp}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 active:scale-95 transition-all shadow-xs"
+                      >
+                        {copied ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            <span className="text-emerald-700 font-bold">Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5 text-gray-500" />
+                            <span>Copy PIN</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    <p className="mt-2.5 text-[11px] leading-tight text-brand-800/90 font-medium">
+                      Share this 4-digit PIN with your driver only after they arrive at your pickup point. The driver cannot start the ride without it.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
