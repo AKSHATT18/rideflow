@@ -99,6 +99,19 @@ export const useRideStore = create<RideStore>((set, get) => ({
       }));
     });
 
+    // Listen for ride pickup verified event
+    socket.on(
+      'ride:pickup_verified',
+      (payload: { rideId: string; status: string; verifiedAt: string }) => {
+        set((state) => ({
+          status: payload.status,
+          activeRide: state.activeRide
+            ? { ...state.activeRide, status: payload.status }
+            : state.activeRide,
+        }));
+      }
+    );
+
     // Listen for live driver GPS location updates
     socket.on(
       'ride:location',
@@ -118,6 +131,7 @@ export const useRideStore = create<RideStore>((set, get) => ({
     const socket = getSocket();
     socket.emit('ride:leave', rideId);
     socket.off('ride:status');
+    socket.off('ride:pickup_verified');
     socket.off('ride:location');
   },
 
