@@ -20,5 +20,9 @@ router.post('/:id/start', requireRole('DRIVER'), rideController.startTrip);
 router.post('/:id/complete', requireRole('DRIVER'), rideController.completeTrip);
 router.post('/:id/status', requireRole('DRIVER'), rideController.updateStatus);
 router.post('/:id/cancel', rideController.cancelRide);
+router.get('/:id/receipt', rideController.getReceipt);
+router.post('/:id/rate', requireRole('PASSENGER'), rideController.rateRide);
+router.get('/:id/otp', requireRole('PASSENGER'), rideController.getRideOTP);
+router.post('/:id/verify-otp', requireRole('DRIVER'), rideController.verifyOTP);
 
 export default router;
