@@ -164,8 +164,11 @@ describe('Live PostgreSQL Ride Lifecycle & Concurrency Verification', () => {
     const arrivedRide = await rideService.markDriverArrived(createdRideId, assignedDriverId);
     expect(arrivedRide.status).toBe('DRIVER_ARRIVED');
 
-    // Step B: Start Ride
-    const startedRide = await rideService.startRide(createdRideId, assignedDriverId);
+    // Step B: Passenger retrieves OTP & Driver verifies OTP to start trip
+    const otpData = await rideService.getRideOTP(createdRideId, passengerId, 'PASSENGER');
+    expect(otpData.otp).toHaveLength(4);
+
+    const startedRide = await rideService.verifyRideOTP(createdRideId, assignedDriverId, otpData.otp);
     expect(startedRide.status).toBe('IN_PROGRESS');
     expect(startedRide.startedAt).toBeInstanceOf(Date);
 
