@@ -3,7 +3,7 @@ import { useAuthStore } from '../store/authStore';
 import { useRideStore } from '../store/rideStore';
 import { api } from '../lib/axios';
 import { Button } from '../components/Button';
-import { LogOut, Navigation, Power, MapPin, Radio } from 'lucide-react';
+import { LogOut, Navigation, Power, MapPin, Radio, KeyRound, ShieldCheck, AlertCircle } from 'lucide-react';
 import { MockGPS } from '../lib/mockGps';
 import { cn } from '../lib/utils';
 
@@ -26,6 +26,10 @@ export const DriverDashboard = () => {
   const [isAccepting, setIsAccepting] = useState<string | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isSimulatingGps, setIsSimulatingGps] = useState(false);
+  const [otpInput, setOtpInput] = useState('');
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [attemptsRemaining, setAttemptsRemaining] = useState<number | null>(null);
   const mockGpsRef = useRef<MockGPS | null>(null);
 
   // Restore active ride on mount
@@ -54,6 +58,15 @@ export const DriverDashboard = () => {
       }
     }
   }, [status, activeRideId]);
+
+  // Reset OTP state when status transitions away from DRIVER_ARRIVED
+  useEffect(() => {
+    if (status !== 'DRIVER_ARRIVED') {
+      setOtpInput('');
+      setOtpError(null);
+      setAttemptsRemaining(null);
+    }
+  }, [status]);
 
   // Poll for rides if online and not in an active ride
   useEffect(() => {
@@ -99,7 +112,7 @@ export const DriverDashboard = () => {
     }
   };
 
-  const handleUpdateStatus = async (endpoint: 'arrive' | 'start' | 'complete') => {
+  const handleUpdateStatus = async (endpoint: 'arrive' | 'complete') => {
     if (!activeRideId) return;
     setIsUpdatingStatus(true);
     try {
@@ -120,6 +133,36 @@ export const DriverDashboard = () => {
       alert(error.response?.data?.message || 'Failed to update ride status');
     } finally {
       setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!activeRideId || otpInput.trim().length !== 4) return;
+
+    setIsVerifyingOtp(true);
+    setOtpError(null);
+
+    try {
+      const res = await api.post(`/rides/${activeRideId}/verify-otp`, {
+        otp: otpInput.trim(),
+      });
+      const updatedRide = res.data.data.ride;
+      setActiveRide(updatedRide.id, updatedRide.status, updatedRide);
+      setOtpInput('');
+      setAttemptsRemaining(null);
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Failed to verify OTP';
+      const remaining = err.response?.data?.data?.attemptsRemaining;
+      setOtpError(message);
+      if (typeof remaining === 'number') {
+        setAttemptsRemaining(remaining);
+      } else if (err.response?.status === 429) {
+        setAttemptsRemaining(0);
+      }
+      setOtpInput('');
+    } finally {
+      setIsVerifyingOtp(false);
     }
   };
 
@@ -299,17 +342,76 @@ export const DriverDashboard = () => {
                 )}
 
                 {status === 'DRIVER_ARRIVED' && (
-                  <Button
-                    className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white"
-                    onClick={() => handleUpdateStatus('start')}
-                    loading={isUpdatingStatus}
-                  >
-                    Start Trip
-                  </Button>
+                  <form onSubmit={handleVerifyOtp} className="space-y-4 bg-gray-50 p-5 rounded-2xl border border-gray-200">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-brand-600 text-white flex items-center justify-center shadow-xs">
+                        <KeyRound className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-sm text-gray-900">Passenger Pickup PIN</h4>
+                        <p className="text-xs text-gray-500">Ask the passenger for their 4-digit PIN to start trip</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="relative">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          maxLength={4}
+                          value={otpInput}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                            setOtpInput(val);
+                            setOtpError(null);
+                          }}
+                          placeholder="••••"
+                          disabled={isVerifyingOtp || attemptsRemaining === 0}
+                          className="w-full text-center tracking-[0.5em] font-mono text-2xl font-bold py-3 px-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed shadow-xs"
+                          aria-label="4-digit pickup PIN"
+                          autoComplete="one-time-code"
+                        />
+                      </div>
+
+                      {otpError && (
+                        <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2 text-xs text-red-700">
+                          <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="font-semibold">{otpError}</p>
+                            {attemptsRemaining !== null && attemptsRemaining > 0 && (
+                              <p className="text-red-600 mt-0.5">
+                                Warning: {attemptsRemaining} attempt{attemptsRemaining > 1 ? 's' : ''} remaining before verification is locked.
+                              </p>
+                            )}
+                            {attemptsRemaining === 0 && (
+                              <p className="text-red-700 font-bold mt-0.5">
+                                Verification locked. Maximum attempts exceeded.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <Button
+                      type="submit"
+                      className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                      disabled={otpInput.length !== 4 || isVerifyingOtp || attemptsRemaining === 0}
+                      loading={isVerifyingOtp}
+                    >
+                      Verify PIN & Start Trip
+                    </Button>
+                  </form>
                 )}
 
                 {status === 'IN_PROGRESS' && (
                   <div className="space-y-3">
+                    <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span className="font-medium">Pickup PIN verified • Trip in progress</span>
+                    </div>
+
                     {!isSimulatingGps ? (
                       <Button
                         className="w-full"
