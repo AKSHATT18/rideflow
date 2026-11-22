@@ -144,9 +144,18 @@ export const acceptRide = async (rideId: string, driverId: string) => {
   // ATOMIC ACCEPTANCE using transaction
   try {
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Verify driver exists and status is ONLINE
-      const driverProfile = await tx.driverProfile.findUnique({ where: { userId: driverId } });
+      // 1. Verify driver exists, is active, verified, and status is ONLINE
+      const driverProfile = await tx.driverProfile.findUnique({
+        where: { userId: driverId },
+        include: { user: { select: { status: true } } },
+      });
       if (!driverProfile) throw new AppError('Driver profile not found', 404);
+      if (driverProfile.user?.status === 'SUSPENDED') {
+        throw new AppError('Suspended drivers cannot accept rides', 403);
+      }
+      if (driverProfile.isVerified === false) {
+        throw new AppError('Unverified drivers cannot accept rides', 403);
+      }
       if (driverProfile.status !== 'ONLINE') {
         throw new AppError('Driver must be ONLINE to accept rides', 400);
       }
