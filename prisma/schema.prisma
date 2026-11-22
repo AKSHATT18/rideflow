@@ -67,22 +67,25 @@ model User {
 }
 
 model DriverProfile {
-  id            String       @id @default(uuid())
-  userId        String       @unique
-  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  licenseNumber String?
-  vehicleMake   String?
-  vehicleModel  String?
-  vehiclePlate  String?
-  vehicleYear   Int?
-  vehicleColor  String?
-  isVerified    Boolean      @default(false)
-  rating        Float        @default(5.0)
-  ratingCount   Int          @default(0)
-  totalTrips    Int          @default(0)
-  status        DriverStatus @default(OFFLINE)
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  id              String       @id @default(uuid())
+  userId          String       @unique
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  licenseNumber   String?
+  vehicleMake     String?
+  vehicleModel    String?
+  vehiclePlate    String?
+  vehicleYear     Int?
+  vehicleColor    String?
+  vehicleCategory String       @default("ECONOMY")
+  isVerified      Boolean      @default(true)
+  rating          Float        @default(5.0)
+  ratingCount     Int          @default(0)
+  totalTrips      Int          @default(0)
+  status          DriverStatus @default(OFFLINE)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([vehiclePlate])
 }
 
 model SavedLocation {
