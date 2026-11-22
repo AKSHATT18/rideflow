@@ -1,11 +1,28 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { useRideStore } from '../store/rideStore';
+import { useDriverStore } from '../store/driverStore';
 import { api } from '../lib/axios';
 import { Button } from '../components/Button';
-import { LogOut, Navigation, Power, MapPin, Radio, KeyRound, ShieldCheck, AlertCircle } from 'lucide-react';
+import {
+  LogOut,
+  Navigation,
+  Power,
+  MapPin,
+  Radio,
+  KeyRound,
+  ShieldCheck,
+  AlertCircle,
+  Wallet,
+  Clock,
+  User,
+} from 'lucide-react';
 import { MockGPS } from '../lib/mockGps';
 import { cn } from '../lib/utils';
+import { DriverNavigationMap } from '../components/driver/DriverNavigationMap';
+import { DriverProfileModal } from '../components/driver/DriverProfileModal';
+import { DriverEarningsModal } from '../components/driver/DriverEarningsModal';
+import { DriverTripHistoryModal } from '../components/driver/DriverTripHistoryModal';
 
 export const DriverDashboard = () => {
   const { logout } = useAuthStore();
@@ -21,6 +38,13 @@ export const DriverDashboard = () => {
     isConnected,
   } = useRideStore();
 
+  const {
+    fetchProfile,
+    setProfileModalOpen,
+    setEarningsModalOpen,
+    setHistoryModalOpen,
+  } = useDriverStore();
+
   const [isOnline, setIsOnline] = useState(false);
   const [pendingRides, setPendingRides] = useState<any[]>([]);
   const [isAccepting, setIsAccepting] = useState<string | null>(null);
@@ -32,10 +56,16 @@ export const DriverDashboard = () => {
   const [attemptsRemaining, setAttemptsRemaining] = useState<number | null>(null);
   const mockGpsRef = useRef<MockGPS | null>(null);
 
-  // Restore active ride on mount
+  // Restore active ride and driver profile on mount
   useEffect(() => {
     fetchActiveRide().then((ride) => {
       if (ride) {
+        setIsOnline(true);
+      }
+    });
+
+    fetchProfile().then((prof) => {
+      if (prof?.driverProfile?.status === 'ONLINE' || prof?.driverProfile?.status === 'BUSY') {
         setIsOnline(true);
       }
     });
@@ -196,17 +226,42 @@ export const DriverDashboard = () => {
               </div>
               <span className="text-xl font-bold text-gray-900 tracking-tight">Driver</span>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Quick Navigation Action Pills */}
+              <button
+                onClick={() => setEarningsModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-gray-100 hover:bg-emerald-50 hover:text-emerald-700 text-gray-700 transition-colors border border-gray-200 shadow-xs"
+              >
+                <Wallet className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="hidden sm:inline">Earnings</span>
+              </button>
+
+              <button
+                onClick={() => setHistoryModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-gray-100 hover:bg-brand-50 hover:text-brand-700 text-gray-700 transition-colors border border-gray-200 shadow-xs"
+              >
+                <Clock className="w-3.5 h-3.5 text-brand-600" />
+                <span className="hidden sm:inline">Trips</span>
+              </button>
+
+              <button
+                onClick={() => setProfileModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-gray-100 hover:bg-brand-50 hover:text-brand-700 text-gray-700 transition-colors border border-gray-200 shadow-xs"
+              >
+                <User className="w-3.5 h-3.5 text-gray-700" />
+                <span className="hidden sm:inline">Profile</span>
+              </button>
+
               <button
                 onClick={toggleOnline}
                 className={cn(
-                  "flex items-center gap-2 px-3.5 py-1.5 rounded-full text-sm font-semibold transition-colors",
+                  "flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-colors shadow-xs ml-1",
                   isOnline
-                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-300"
                     : "bg-gray-100 text-gray-700 border border-gray-200"
                 )}
               >
-                <Power className="w-4 h-4" />
+                <Power className="w-3.5 h-3.5" />
                 {isOnline ? 'Online' : 'Offline'}
               </button>
               <button onClick={logout} className="p-2 text-gray-400 hover:text-gray-900" title="Logout">
@@ -293,169 +348,179 @@ export const DriverDashboard = () => {
         )}
 
         {activeRideId && (
-          <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden max-w-xl mx-auto">
-            <div className="bg-brand-600 p-6 text-white flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-bold mb-0.5">Active Ride</h2>
-                <p className="text-brand-100 text-xs font-medium">Status: {status}</p>
-              </div>
-              {isConnected && (
-                <div className="flex items-center gap-1.5 text-xs bg-brand-700 text-brand-100 px-2.5 py-1 rounded-full">
-                  <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
-                  Connected
-                </div>
-              )}
-            </div>
+          <div className="space-y-6 max-w-2xl mx-auto">
+            {/* Live Turn-by-Turn Navigation Map */}
+            <DriverNavigationMap />
 
-            <div className="p-6 space-y-6">
-              <div className="flex justify-between items-center border-b border-gray-100 pb-4">
-                <span className="text-sm font-bold text-gray-700">Passenger</span>
-                <span className="font-semibold text-gray-900">
-                  {activeRide?.passenger?.firstName} {activeRide?.passenger?.lastName}
-                </span>
-              </div>
-
-              <div className="space-y-3 text-sm font-medium text-gray-700 bg-gray-50 p-4 rounded-2xl">
+            <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
+              <div className="bg-brand-600 p-6 text-white flex items-center justify-between">
                 <div>
-                  <span className="text-xs text-gray-400 block mb-0.5">Pickup</span>
-                  <p className="text-gray-900">{activeRide?.pickupAddress}</p>
+                  <h2 className="text-xl font-bold mb-0.5">Active Ride</h2>
+                  <p className="text-brand-100 text-xs font-medium">Status: {status}</p>
                 </div>
-                <div className="pt-2 border-t border-gray-200">
-                  <span className="text-xs text-gray-400 block mb-0.5">Destination</span>
-                  <p className="text-gray-900">{activeRide?.destinationAddress}</p>
-                </div>
-                <div className="pt-2 border-t border-gray-200 flex justify-between items-center">
-                  <span className="text-xs text-gray-500 font-semibold">Estimated Fare</span>
-                  <span className="text-lg font-bold text-gray-900">₹{activeRide?.estimatedFare}</span>
-                </div>
+                {isConnected && (
+                  <div className="flex items-center gap-1.5 text-xs bg-brand-700 text-brand-100 px-2.5 py-1 rounded-full">
+                    <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
+                    Connected
+                  </div>
+                )}
               </div>
 
-              <div className="space-y-3 pt-2">
-                {status === 'DRIVER_ASSIGNED' && (
-                  <Button
-                    className="w-full h-12"
-                    onClick={() => handleUpdateStatus('arrive')}
-                    loading={isUpdatingStatus}
-                  >
-                    Mark Arrived at Pickup
-                  </Button>
-                )}
+              <div className="p-6 space-y-6">
+                <div className="flex justify-between items-center border-b border-gray-100 pb-4">
+                  <span className="text-sm font-bold text-gray-700">Passenger</span>
+                  <span className="font-semibold text-gray-900">
+                    {activeRide?.passenger?.firstName} {activeRide?.passenger?.lastName}
+                  </span>
+                </div>
 
-                {status === 'DRIVER_ARRIVED' && (
-                  <form onSubmit={handleVerifyOtp} className="space-y-4 bg-gray-50 p-5 rounded-2xl border border-gray-200">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-xl bg-brand-600 text-white flex items-center justify-center shadow-xs">
-                        <KeyRound className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-sm text-gray-900">Passenger Pickup PIN</h4>
-                        <p className="text-xs text-gray-500">Ask the passenger for their 4-digit PIN to start trip</p>
-                      </div>
-                    </div>
+                <div className="space-y-3 text-sm font-medium text-gray-700 bg-gray-50 p-4 rounded-2xl">
+                  <div>
+                    <span className="text-xs text-gray-400 block mb-0.5">Pickup</span>
+                    <p className="text-gray-900">{activeRide?.pickupAddress}</p>
+                  </div>
+                  <div className="pt-2 border-t border-gray-200">
+                    <span className="text-xs text-gray-400 block mb-0.5">Destination</span>
+                    <p className="text-gray-900">{activeRide?.destinationAddress}</p>
+                  </div>
+                  <div className="pt-2 border-t border-gray-200 flex justify-between items-center">
+                    <span className="text-xs text-gray-500 font-semibold">Estimated Fare</span>
+                    <span className="text-lg font-bold text-gray-900">₹{activeRide?.estimatedFare}</span>
+                  </div>
+                </div>
 
-                    <div className="space-y-2">
-                      <div className="relative">
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          maxLength={4}
-                          value={otpInput}
-                          onChange={(e) => {
-                            const val = e.target.value.replace(/\D/g, '').slice(0, 4);
-                            setOtpInput(val);
-                            setOtpError(null);
-                          }}
-                          placeholder="••••"
-                          disabled={isVerifyingOtp || attemptsRemaining === 0}
-                          className="w-full text-center tracking-[0.5em] font-mono text-2xl font-bold py-3 px-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed shadow-xs"
-                          aria-label="4-digit pickup PIN"
-                          autoComplete="one-time-code"
-                        />
-                      </div>
-
-                      {otpError && (
-                        <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2 text-xs text-red-700">
-                          <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-                          <div>
-                            <p className="font-semibold">{otpError}</p>
-                            {attemptsRemaining !== null && attemptsRemaining > 0 && (
-                              <p className="text-red-600 mt-0.5">
-                                Warning: {attemptsRemaining} attempt{attemptsRemaining > 1 ? 's' : ''} remaining before verification is locked.
-                              </p>
-                            )}
-                            {attemptsRemaining === 0 && (
-                              <p className="text-red-700 font-bold mt-0.5">
-                                Verification locked. Maximum attempts exceeded.
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
+                <div className="space-y-3 pt-2">
+                  {status === 'DRIVER_ASSIGNED' && (
                     <Button
-                      type="submit"
-                      className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
-                      disabled={otpInput.length !== 4 || isVerifyingOtp || attemptsRemaining === 0}
-                      loading={isVerifyingOtp}
-                    >
-                      Verify PIN & Start Trip
-                    </Button>
-                  </form>
-                )}
-
-                {status === 'IN_PROGRESS' && (
-                  <div className="space-y-3">
-                    <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2">
-                      <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span className="font-medium">Pickup PIN verified • Trip in progress</span>
-                    </div>
-
-                    {!isSimulatingGps ? (
-                      <Button
-                        className="w-full"
-                        variant="outline"
-                        onClick={startGpsSimulation}
-                      >
-                        <Radio className="w-4 h-4 mr-2 text-brand-600" />
-                        [Dev] Start GPS Simulation
-                      </Button>
-                    ) : (
-                      <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-800 flex items-center justify-center gap-2">
-                        <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></span>
-                        GPS Simulation Active (Emitting over Socket.IO)
-                      </div>
-                    )}
-
-                    <Button
-                      className="w-full h-12 bg-gray-900 hover:bg-black text-white"
-                      onClick={() => handleUpdateStatus('complete')}
+                      className="w-full h-12"
+                      onClick={() => handleUpdateStatus('arrive')}
                       loading={isUpdatingStatus}
                     >
-                      Complete Trip
+                      Mark Arrived at Pickup
                     </Button>
-                  </div>
-                )}
+                  )}
 
-                {status === 'CANCELLED' && (
-                  <div className="text-center p-4 bg-red-50 rounded-xl text-red-600 font-medium text-sm">
-                    This ride has been cancelled.
-                    <Button
-                      className="mt-4 w-full"
-                      onClick={() => {
-                        clearRide();
-                      }}
-                    >
-                      Back to Dashboard
-                    </Button>
-                  </div>
-                )}
+                  {status === 'DRIVER_ARRIVED' && (
+                    <form onSubmit={handleVerifyOtp} className="space-y-4 bg-gray-50 p-5 rounded-2xl border border-gray-200">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-brand-600 text-white flex items-center justify-center shadow-xs">
+                          <KeyRound className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-sm text-gray-900">Passenger Pickup PIN</h4>
+                          <p className="text-xs text-gray-500">Ask the passenger for their 4-digit PIN to start trip</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="relative">
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            maxLength={4}
+                            value={otpInput}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                              setOtpInput(val);
+                              setOtpError(null);
+                            }}
+                            placeholder="••••"
+                            disabled={isVerifyingOtp || attemptsRemaining === 0}
+                            className="w-full text-center tracking-[0.5em] font-mono text-2xl font-bold py-3 px-4 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed shadow-xs"
+                            aria-label="4-digit pickup PIN"
+                            autoComplete="one-time-code"
+                          />
+                        </div>
+
+                        {otpError && (
+                          <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2 text-xs text-red-700">
+                            <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                            <div>
+                              <p className="font-semibold">{otpError}</p>
+                              {attemptsRemaining !== null && attemptsRemaining > 0 && (
+                                <p className="text-red-600 mt-0.5">
+                                  Warning: {attemptsRemaining} attempt{attemptsRemaining > 1 ? 's' : ''} remaining before verification is locked.
+                                </p>
+                              )}
+                              {attemptsRemaining === 0 && (
+                                <p className="text-red-700 font-bold mt-0.5">
+                                  Verification locked. Maximum attempts exceeded.
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <Button
+                        type="submit"
+                        className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                        disabled={otpInput.length !== 4 || isVerifyingOtp || attemptsRemaining === 0}
+                        loading={isVerifyingOtp}
+                      >
+                        Verify PIN & Start Trip
+                      </Button>
+                    </form>
+                  )}
+
+                  {status === 'IN_PROGRESS' && (
+                    <div className="space-y-3">
+                      <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2">
+                        <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span className="font-medium">Pickup PIN verified • Trip in progress</span>
+                      </div>
+
+                      {!isSimulatingGps ? (
+                        <Button
+                          className="w-full"
+                          variant="outline"
+                          onClick={startGpsSimulation}
+                        >
+                          <Radio className="w-4 h-4 mr-2 text-brand-600" />
+                          [Dev] Start GPS Simulation
+                        </Button>
+                      ) : (
+                        <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-800 flex items-center justify-center gap-2">
+                          <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                          GPS Simulation Active (Emitting over Socket.IO)
+                        </div>
+                      )}
+
+                      <Button
+                        className="w-full h-12 bg-gray-900 hover:bg-black text-white"
+                        onClick={() => handleUpdateStatus('complete')}
+                        loading={isUpdatingStatus}
+                      >
+                        Complete Trip
+                      </Button>
+                    </div>
+                  )}
+
+                  {status === 'CANCELLED' && (
+                    <div className="text-center p-4 bg-red-50 rounded-xl text-red-600 font-medium text-sm">
+                      This ride has been cancelled.
+                      <Button
+                        className="mt-4 w-full"
+                        onClick={() => {
+                          clearRide();
+                        }}
+                      >
+                        Back to Dashboard
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         )}
       </main>
+
+      {/* Driver Modals */}
+      <DriverProfileModal />
+      <DriverEarningsModal />
+      <DriverTripHistoryModal />
     </div>
   );
 };
